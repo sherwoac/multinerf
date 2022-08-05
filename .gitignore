@@ -1,1 +1,4 @@
 .idea/
+internal/__pycache__/
+internal/pycolmap/
+tests/__pycache__/
