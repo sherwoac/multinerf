@@ -24,15 +24,7 @@ git clone https://github.com/google-research/multinerf.git
 cd multinerf
 
 # Make a conda environment.
-conda create --name multinerf python=3.9
-conda activate multinerf
-
-# Prepare pip.
-conda install pip
-pip install --upgrade pip
-
-# Install requirements.
-pip install -r requirements.txt
+conda env create -f requirements.yaml
 
 # Manually install rmbrualla's `pycolmap` (don't use pip's! It's different).
 git clone https://github.com/rmbrualla/pycolmap.git ./internal/pycolmap
