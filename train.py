@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Training script."""
+import os
 
 import functools
 import gc
@@ -284,5 +285,8 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
+  print(os.environ)
+  # if jax._src.lib.cuda_path is not None:
+  #   debug_options.xla_gpu_cuda_data_dir = jax._src.lib.cuda_path
   with gin.config_scope('train'):
     app.run(main)
