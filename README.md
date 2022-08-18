@@ -20,14 +20,11 @@ This is research code, and should be treated accordingly.
 
 ```
 # Clone the repo.
-git clone https://github.com/google-research/multinerf.git
+git clone --recurse-submodules https://github.com/google-research/multinerf.git
 cd multinerf
 
 # Make a conda environment.
 conda env create -f requirements.yaml
-
-# Manually install rmbrualla's `pycolmap` (don't use pip's! It's different).
-git clone https://github.com/rmbrualla/pycolmap.git ./internal/pycolmap
 
 # Confirm that all the unit tests pass.
 ./scripts/run_all_unit_tests.sh
