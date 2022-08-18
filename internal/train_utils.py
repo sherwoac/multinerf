@@ -140,7 +140,7 @@ def interlevel_loss(ray_history, config):
   for ray_results in ray_history[:-1]:
     cp = ray_results['sdist']
     wp = ray_results['weights']
-    loss_interlevel += jnp.mean(stepfun.lossfun_outer(c, w, cp, wp))
+    loss_interlevel += jnp.mean(stepfun.lossfun_outer(c, w, cp, wp, eps=jnp.finfo(config.dtype).eps))
   return config.interlevel_loss_mult * loss_interlevel
 
 
@@ -399,7 +399,9 @@ def setup_model(
   """Creates NeRF model, optimizer, and pmap-ed train/render functions."""
 
   dummy_rays = utils.dummy_rays(
-      include_exposure_idx=config.rawnerf_mode, include_exposure_values=True)
+    include_exposure_idx=config.rawnerf_mode,
+    include_exposure_values=True,
+    dtype=config.dtype)
   model, variables = models.construct_model(rng, dummy_rays, config)
 
   state, lr_fn = create_optimizer(config, variables)

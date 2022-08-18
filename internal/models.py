@@ -101,11 +101,11 @@ class Model(nn.Module):
     if self.num_glo_features > 0:
       if not zero_glo:
         # Construct/grab GLO vectors for the cameras of each input ray.
-        glo_vecs = nn.Embed(self.num_glo_embeddings, self.num_glo_features)
+        glo_vecs = nn.Embed(self.num_glo_embeddings, self.num_glo_features, param_type=self.config.dtype)
         cam_idx = rays.cam_idx[..., 0]
         glo_vec = glo_vecs(cam_idx)
       else:
-        glo_vec = jnp.zeros(rays.origins.shape[:-1] + (self.num_glo_features,))
+        glo_vec = jnp.zeros(rays.origins.shape[:-1] + (self.num_glo_features,), dtype=self.config.dtype)
     else:
       glo_vec = None
 
@@ -135,11 +135,11 @@ class Model(nn.Module):
                              self.near_anneal_init)
     init_s_far = 1.
     sdist = jnp.concatenate([
-        jnp.full_like(rays.near, init_s_near),
-        jnp.full_like(rays.far, init_s_far)
+        jnp.full_like(rays.near, init_s_near, dtype=self.config.dtype),
+        jnp.full_like(rays.far, init_s_far, dtype=self.config.dtype)
     ],
                             axis=-1)
-    weights = jnp.ones_like(rays.near)
+    weights = jnp.ones_like(rays.near, dtype=self.config.dtype)
     prod_num_samples = 1
 
     ray_history = []
@@ -166,7 +166,8 @@ class Model(nn.Module):
             weights,
             dilation,
             domain=(init_s_near, init_s_far),
-            renormalize=True)
+            renormalize=True,
+            eps=jnp.finfo(self.config.dtype).eps)
         sdist = sdist[..., 1:-1]
         weights = weights[..., 1:-1]
 
@@ -215,7 +216,7 @@ class Model(nn.Module):
       if self.disable_integration:
         # Setting the covariance of our Gaussian samples to 0 disables the
         # "integrated" part of integrated positional encoding.
-        gaussians = (gaussians[0], jnp.zeros_like(gaussians[1]))
+        gaussians = (gaussians[0], jnp.zeros_like(gaussians[1], dtype=self.config.dtype))
 
       # Push our Gaussians through one of our two MLPs.
       mlp = prop_mlp if is_prop else nerf_mlp
@@ -377,6 +378,7 @@ class MLP(nn.Module):
   warp_fn: Callable[..., Any] = None
   basis_shape: str = 'icosahedron'  # `octahedron` or `icosahedron`.
   basis_subdivisions: int = 2  # Tesselation count. 'octahedron' + 1 == eye(3).
+  dtype: str = 'float32'
 
   def setup(self):
     # Make sure that normals are computed if reflection direction is used.
@@ -434,7 +436,10 @@ class MLP(nn.Module):
     """
 
     dense_layer = functools.partial(
-        nn.Dense, kernel_init=getattr(jax.nn.initializers, self.weight_init)())
+        nn.Dense,
+        param_dtype=self.dtype,
+        dtype=self.dtype,
+        kernel_init=getattr(jax.nn.initializers, self.weight_init)())
 
     density_key, rng = random_split(rng)
 

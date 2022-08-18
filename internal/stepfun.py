@@ -26,6 +26,7 @@ from internal import math
 import jax
 import jax.numpy as jnp
 
+import gin
 
 def searchsorted(a, v):
   """Find indices where v should be inserted into a to maintain order.
@@ -63,7 +64,7 @@ def query(tq, t, y, outside_value=0):
 
 def inner_outer(t0, t1, y1):
   """Construct inner and outer measures on (t1, y1) for t0."""
-  cy1 = jnp.concatenate([jnp.zeros_like(y1[..., :1]),
+  cy1 = jnp.concatenate([jnp.zeros_like(y1[..., :1], dtype=gin.query_parameter('Config.dtype')),
                          jnp.cumsum(y1, axis=-1)],
                         axis=-1)
   idx_lo, idx_hi = searchsorted(t1, t0)
@@ -120,7 +121,7 @@ def max_dilate_weights(t,
                        renormalize=False,
                        eps=jnp.finfo(jnp.float32).eps**2):
   """Dilate (via max-pooling) a set of weights."""
-  p = weight_to_pdf(t, w)
+  p = weight_to_pdf(t, w, eps=jnp.finfo(gin.query_parameter('Config.dtype')).eps)
   t_dilate, p_dilate = max_dilate(t, p, dilation, domain=domain)
   w_dilate = pdf_to_weight(t_dilate, p_dilate)
   if renormalize:
@@ -146,7 +147,12 @@ def integrate_weights(w):
   cw = jnp.minimum(1, jnp.cumsum(w[..., :-1], axis=-1))
   shape = cw.shape[:-1] + (1,)
   # Ensure that the CDF starts with exactly 0 and ends with exactly 1.
-  cw0 = jnp.concatenate([jnp.zeros(shape), cw, jnp.ones(shape)], axis=-1)
+  cw0 = jnp.concatenate([jnp.zeros(shape,
+                                   dtype=gin.query_parameter('Config.dtype')),
+                         cw,
+                         jnp.ones(shape,
+                                  dtype=gin.query_parameter('Config.dtype'))],
+                        axis=-1)
   return cw0
 
 
@@ -188,16 +194,16 @@ def sample(rng,
   Returns:
     t_samples: jnp.ndarray(float32), [batch_size, num_samples].
   """
-  eps = jnp.finfo(jnp.float32).eps
+  eps = jnp.finfo(gin.query_parameter('Config.dtype')).eps
 
   # Draw uniform samples.
   if rng is None:
     # Match the behavior of jax.random.uniform() by spanning [0, 1-eps].
     if deterministic_center:
       pad = 1 / (2 * num_samples)
-      u = jnp.linspace(pad, 1. - pad - eps, num_samples)
+      u = jnp.linspace(pad, 1. - pad - eps, num_samples, dtype=gin.query_parameter('Config.dtype'))
     else:
-      u = jnp.linspace(0, 1. - eps, num_samples)
+      u = jnp.linspace(0, 1. - eps, num_samples, dtype=gin.query_parameter('Config.dtype'))
     u = jnp.broadcast_to(u, t.shape[:-1] + (num_samples,))
   else:
     # `u` is in [0, 1) --- it can be zero, but it can never be 1.
@@ -205,8 +211,8 @@ def sample(rng,
     max_jitter = (1 - u_max) / (num_samples - 1) - eps
     d = 1 if single_jitter else num_samples
     u = (
-        jnp.linspace(0, 1 - u_max, num_samples) +
-        jax.random.uniform(rng, t.shape[:-1] + (d,), maxval=max_jitter))
+        jnp.linspace(0, 1 - u_max, num_samples, dtype=gin.query_parameter('Config.dtype')) +
+        jax.random.uniform(rng, t.shape[:-1] + (d,), maxval=max_jitter, dtype=gin.query_parameter('Config.dtype')))
 
   return invert_cdf(u, t, w_logits, use_gpu_resampling=use_gpu_resampling)
 
@@ -299,7 +305,7 @@ def weighted_percentile(t, w, ps):
   """Compute the weighted percentiles of a step function. w's must sum to 1."""
   cw = integrate_weights(w)
   # We want to interpolate into the integrated weights according to `ps`.
-  fn = lambda cw_i, t_i: jnp.interp(jnp.array(ps) / 100, cw_i, t_i)
+  fn = lambda cw_i, t_i: jnp.interp(jnp.array(ps, dtype=gin.query_parameter('Config.dtype')) / 100, cw_i, t_i)
   # Vmap fn to an arbitrary number of leading dimensions.
   cw_mat = cw.reshape([-1, cw.shape[-1]])
   t_mat = t.reshape([-1, t.shape[-1]])
@@ -328,14 +334,15 @@ def resample(t, tp, vp, use_avg=False, eps=jnp.finfo(jnp.float32).eps):
     v: tensor with shape (..., n), the values of the resampled step function.
   """
   if use_avg:
+    eps = jnp.finfo(gin.query_parameter('Config.dtype')).eps
     wp = jnp.diff(tp, axis=-1)
-    v_numer = resample(t, tp, vp * wp, use_avg=False)
-    v_denom = resample(t, tp, wp, use_avg=False)
+    v_numer = resample(t, tp, vp * wp, use_avg=False, eps=eps)
+    v_denom = resample(t, tp, wp, use_avg=False, eps=eps)
     v = v_numer / jnp.maximum(eps, v_denom)
     return v
 
   acc = jnp.cumsum(vp, axis=-1)
-  acc0 = jnp.concatenate([jnp.zeros(acc.shape[:-1] + (1,)), acc], axis=-1)
+  acc0 = jnp.concatenate([jnp.zeros(acc.shape[:-1] + (1,), dtype=gin.query_parameter('Config.dtype')), acc], axis=-1)
   acc0_resampled = jnp.vectorize(
       jnp.interp, signature='(n),(m),(m)->(n)')(t, tp, acc0)
   v = jnp.diff(acc0_resampled, axis=-1)

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Helper functions for shooting and rendering rays."""
+import gin
 
 from internal import stepfun
 import jax.numpy as jnp
@@ -33,7 +34,7 @@ def lift_gaussian(d, t_mean, t_var, r_var, diag):
     return mean, cov_diag
   else:
     d_outer = d[..., :, None] * d[..., None, :]
-    eye = jnp.eye(d.shape[-1])
+    eye = jnp.eye(d.shape[-1], dtype=gin.query_parameter('Config.dtype'))
     null_outer = eye - d[..., :, None] * (d / d_mag_sq)[..., None, :]
     t_cov = t_var[..., None, None] * d_outer[..., None, :, :]
     xy_cov = r_var[..., None, None] * null_outer[..., None, :, :]
@@ -63,7 +64,7 @@ def conical_frustum_to_gaussian(d, t0, t1, base_radius, diag, stable=True):
     # Equation 7 in the paper (https://arxiv.org/abs/2103.13415).
     mu = (t0 + t1) / 2  # The average of the two `t` values.
     hw = (t1 - t0) / 2  # The half-width of the two `t` values.
-    eps = jnp.finfo(jnp.float32).eps
+    eps = jnp.finfo(gin.query_parameter('Config.dtype')).eps
     t_mean = mu + (2 * mu * hw**2) / jnp.maximum(eps, 3 * mu**2 + hw**2)
     denom = jnp.maximum(eps, 3 * mu**2 + hw**2)
     t_var = (hw**2) / 3 - (4 / 15) * hw**4 * (12 * mu**2 - hw**2) / denom**2
@@ -137,13 +138,16 @@ def compute_alpha_weights(density, tdist, dirs, opaque_background=False):
     # Equivalent to making the final t-interval infinitely wide.
     density_delta = jnp.concatenate([
         density_delta[..., :-1],
-        jnp.full_like(density_delta[..., -1:], jnp.inf)
+        jnp.full_like(density_delta[..., -1:],
+                      jnp.inf,
+                      dtype=gin.query_parameter('Config.dtype'))
     ],
                                     axis=-1)
 
   alpha = 1 - jnp.exp(-density_delta)
   trans = jnp.exp(-jnp.concatenate([
-      jnp.zeros_like(density_delta[..., :1]),
+      jnp.zeros_like(density_delta[..., :1],
+                     dtype=gin.query_parameter('Config.dtype')),
       jnp.cumsum(density_delta[..., :-1], axis=-1)
   ],
                                    axis=-1))
@@ -173,7 +177,7 @@ def volumetric_rendering(rgbs,
     rendering: a dict containing an rgb image of size [batch_size, 3], and other
       visualizations if compute_extras=True.
   """
-  eps = jnp.finfo(jnp.float32).eps
+  eps = jnp.finfo(gin.query_parameter('Config.dtype')).eps
   rendering = {}
 
   acc = weights.sum(axis=-1)

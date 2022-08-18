@@ -59,8 +59,9 @@ class Rays:
 
 # Dummy Rays object that can be used to initialize NeRF model.
 def dummy_rays(include_exposure_idx: bool = False,
-               include_exposure_values: bool = False) -> Rays:
-  data_fn = lambda n: jnp.zeros((1, n))
+               include_exposure_values: bool = False,
+               dtype='float32') -> Rays:
+  data_fn = lambda n: jnp.zeros((1, n), dtype=dtype)
   exposure_kwargs = {}
   if include_exposure_idx:
     exposure_kwargs['exposure_idx'] = data_fn(1).astype(jnp.int32)

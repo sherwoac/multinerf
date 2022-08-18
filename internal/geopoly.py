@@ -17,6 +17,7 @@
 import itertools
 import numpy as np
 
+import gin
 
 def compute_sq_dist(mat0, mat1=None):
   """Compute the squared Euclidean distance between all pairs of columns."""
@@ -38,7 +39,7 @@ def compute_tesselation_weights(v):
   for i in range(v + 1):
     for j in range(v + 1 - i):
       int_weights.append((i, j, v - (i + j)))
-  int_weights = np.array(int_weights)
+  int_weights = np.array(int_weights, dtype=gin.query_parameter('Config.dtype'))
   weights = int_weights / v  # Barycentric weights.
   return weights
 
@@ -72,7 +73,7 @@ def tesselate_geodesic(base_verts, base_faces, v, eps=1e-4):
   unique = np.unique(assignment)
   verts = verts[unique, :]
 
-  return verts
+  return verts.astype(gin.query_parameter('Config.dtype'))
 
 
 def generate_basis(base_shape,
@@ -95,20 +96,20 @@ def generate_basis(base_shape,
     basis: a matrix with shape [3, n].
   """
   if base_shape == 'icosahedron':
-    a = (np.sqrt(5) + 1) / 2
+    a = (np.sqrt(5.) + 1) / 2
     verts = np.array([(-1, 0, a), (1, 0, a), (-1, 0, -a), (1, 0, -a), (0, a, 1),
                       (0, a, -1), (0, -a, 1), (0, -a, -1), (a, 1, 0),
-                      (-a, 1, 0), (a, -1, 0), (-a, -1, 0)]) / np.sqrt(a + 2)
+                      (-a, 1, 0), (a, -1, 0), (-a, -1, 0)], dtype=gin.query_parameter('Config.dtype')) / np.sqrt(a + 2)
     faces = np.array([(0, 4, 1), (0, 9, 4), (9, 5, 4), (4, 5, 8), (4, 8, 1),
                       (8, 10, 1), (8, 3, 10), (5, 3, 8), (5, 2, 3), (2, 7, 3),
                       (7, 10, 3), (7, 6, 10), (7, 11, 6), (11, 0, 6), (0, 1, 6),
                       (6, 1, 10), (9, 0, 11), (9, 11, 2), (9, 2, 5),
-                      (7, 2, 11)])
+                      (7, 2, 11)], dtype=gin.query_parameter('Config.dtype'))
     verts = tesselate_geodesic(verts, faces, angular_tesselation)
   elif base_shape == 'octahedron':
     verts = np.array([(0, 0, -1), (0, 0, 1), (0, -1, 0), (0, 1, 0), (-1, 0, 0),
-                      (1, 0, 0)])
-    corners = np.array(list(itertools.product([-1, 1], repeat=3)))
+                      (1, 0, 0)], dtype=gin.query_parameter('Config.dtype'))
+    corners = np.array(list(itertools.product([-1, 1], repeat=3)), dtype=gin.query_parameter('Config.dtype'))
     pairs = np.argwhere(compute_sq_dist(corners.T, verts.T) == 2)
     faces = np.sort(np.reshape(pairs[:, 1], [3, -1]).T, 1)
     verts = tesselate_geodesic(verts, faces, angular_tesselation)

@@ -26,6 +26,8 @@ import jax.numpy as jnp
 import numpy as np
 import scipy
 
+import gin
+
 _Array = Union[np.ndarray, jnp.ndarray]
 
 
@@ -84,12 +86,12 @@ def convert_to_ndc(origins: _Array,
   # Perspective projection into NDC for the t = 0 near points
   #     origins + 0 * directions
   origins_ndc = xnp.stack([xmult * ox / oz, ymult * oy / oz,
-                           -xnp.ones_like(oz)], axis=-1)
+                           -xnp.ones_like(oz, dtype=gin.query_parameter('Config.dtype'))], axis=-1)
 
   # Perspective projection into NDC for the t = infinity far points
   #     origins + infinity * directions
   infinity_ndc = np.stack([xmult * dx / dz, ymult * dy / dz,
-                           xnp.ones_like(oz)],
+                           xnp.ones_like(oz, dtype=gin.query_parameter('Config.dtype'))],
                           axis=-1)
 
   # directions_ndc points from origins_ndc to infinity_ndc
@@ -144,7 +146,7 @@ def normalize(x: np.ndarray) -> np.ndarray:
 def focus_point_fn(poses: np.ndarray) -> np.ndarray:
   """Calculate nearest point to all focal axes in poses."""
   directions, origins = poses[:, :3, 2:3], poses[:, :3, 3:4]
-  m = np.eye(3) - directions * np.transpose(directions, [0, 2, 1])
+  m = np.eye(3, dtype=gin.query_parameter('Config.dtype')) - directions * np.transpose(directions, [0, 2, 1])
   mt_m = np.transpose(m, [0, 2, 1]) @ m
   focus_pt = np.linalg.inv(mt_m.mean(0)) @ (mt_m @ origins).mean(0)[:, 0]
   return focus_pt
@@ -315,7 +317,7 @@ def generate_interpolated_path(poses: np.ndarray,
     pts = np.reshape(points, (sh[0], -1))
     k = min(k, sh[0] - 1)
     tck, _ = scipy.interpolate.splprep(pts.T, k=k, s=s)
-    u = np.linspace(0, 1, n, endpoint=False)
+    u = np.linspace(0, 1, n, endpoint=False, dtype=gin.query_parameter('Config.dtype'))
     new_points = np.array(scipy.interpolate.splev(u, tck))
     new_points = np.reshape(new_points.T, (n, sh[1], sh[2]))
     return new_points
@@ -333,10 +335,10 @@ def interpolate_1d(x: np.ndarray,
                    spline_degree: int,
                    smoothness: float) -> np.ndarray:
   """Interpolate 1d signal x (by a factor of n_interp times)."""
-  t = np.linspace(0, 1, len(x), endpoint=True)
+  t = np.linspace(0, 1, len(x), endpoint=True, dtype=gin.query_parameter('Config.dtype'))
   tck = scipy.interpolate.splrep(t, x, s=smoothness, k=spline_degree)
   n = n_interp * (len(x) - 1)
-  u = np.linspace(0, 1, n, endpoint=False)
+  u = np.linspace(0, 1, n, endpoint=False, dtype=gin.query_parameter('Config.dtype'))
   return scipy.interpolate.splev(u, tck)
 
 
@@ -558,20 +560,20 @@ def pixels_to_rays(
   """
   # Must add half pixel offset to shoot rays through pixel centers.
   def pix_to_dir(x, y):
-    return xnp.stack([x + .5, y + .5, xnp.ones_like(x)], axis=-1)
+    return xnp.stack([x + .5, y + .5, xnp.ones_like(x, dtype=gin.query_parameter('Config.dtype'))], axis=-1)
   # We need the dx and dy rays to calculate ray radii for mip-NeRF cones.
   pixel_dirs_stacked = xnp.stack([
       pix_to_dir(pix_x_int, pix_y_int),
       pix_to_dir(pix_x_int + 1, pix_y_int),
       pix_to_dir(pix_x_int, pix_y_int + 1)
-  ], axis=0)
+  ], axis=0).astype(dtype=gin.query_parameter('Config.dtype'))
 
   # For jax, need to specify high-precision matmul.
   matmul = math.matmul if xnp == jnp else xnp.matmul
   mat_vec_mul = lambda A, b: matmul(A, b[..., None])[..., 0]
 
   # Apply inverse intrinsic matrices.
-  camera_dirs_stacked = mat_vec_mul(pixtocams, pixel_dirs_stacked)
+  camera_dirs_stacked = mat_vec_mul(pixtocams, pixel_dirs_stacked).astype(dtype=gin.query_parameter('Config.dtype'))
 
   if distortion_params is not None:
     # Correct for distortion.
@@ -580,7 +582,7 @@ def pixels_to_rays(
         camera_dirs_stacked[..., 1],
         **distortion_params,
         xnp=xnp)
-    camera_dirs_stacked = xnp.stack([x, y, xnp.ones_like(x)], -1)
+    camera_dirs_stacked = xnp.stack([x, y, xnp.ones_like(x, dtype=gin.query_parameter('Config.dtype'))], -1)
 
   if camtype == ProjectionType.FISHEYE:
     theta = xnp.sqrt(xnp.sum(xnp.square(camera_dirs_stacked[..., :2]), axis=-1))
@@ -595,19 +597,20 @@ def pixels_to_rays(
 
   # Flip from OpenCV to OpenGL coordinate system.
   camera_dirs_stacked = matmul(camera_dirs_stacked,
-                               xnp.diag(xnp.array([1., -1., -1.])))
+                               xnp.diag(xnp.array([1., -1., -1.], dtype=gin.query_parameter('Config.dtype')))).astype(
+      dtype=gin.query_parameter('Config.dtype'))
 
   # Extract 2D image plane (x, y) coordinates.
   imageplane = camera_dirs_stacked[0, ..., :2]
 
   # Apply camera rotation matrices.
   directions_stacked = mat_vec_mul(camtoworlds[..., :3, :3],
-                                   camera_dirs_stacked)
+                                   camera_dirs_stacked).astype(dtype=gin.query_parameter('Config.dtype'))
   # Extract the offset rays.
   directions, dx, dy = directions_stacked
 
-  origins = xnp.broadcast_to(camtoworlds[..., :3, -1], directions.shape)
-  viewdirs = directions / xnp.linalg.norm(directions, axis=-1, keepdims=True)
+  origins = xnp.broadcast_to(camtoworlds[..., :3, -1], directions.shape).astype(dtype=gin.query_parameter('Config.dtype'))
+  viewdirs = directions / xnp.linalg.norm(directions, axis=-1, keepdims=True).astype(dtype=gin.query_parameter('Config.dtype'))
 
   if pixtocam_ndc is None:
     # Distance from each unit-norm direction vector to its neighbors.
@@ -626,7 +629,7 @@ def pixels_to_rays(
 
   # Cut the distance in half, multiply it to match the variance of a uniform
   # distribution the size of a pixel (1/12, see the original mipnerf paper).
-  radii = (0.5 * (dx_norm + dy_norm))[..., None] * 2 / xnp.sqrt(12)
+  radii = ((0.5 * (dx_norm + dy_norm))[..., None] * 2 / xnp.sqrt(12)).astype(dtype=gin.query_parameter('Config.dtype'))
 
   return origins, directions, viewdirs, radii, imageplane
 
@@ -748,7 +751,7 @@ def cast_spherical_rays(camtoworld: _Array,
   dy_norm = xnp.linalg.norm(dy, axis=-1)
   radii = (0.5 * (dx_norm + dy_norm))[..., None] * 2 / xnp.sqrt(12)
 
-  imageplane = xnp.zeros_like(directions[..., :2])
+  imageplane = xnp.zeros_like(directions[..., :2], dtype=gin.query_parameter('Config.dtype'))
 
   ray_args = (origins, directions, viewdirs, radii, imageplane)
 

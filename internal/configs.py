@@ -163,7 +163,7 @@ class Config:
   autoexpose_renders: bool = False  # During rendering, autoexpose each image.
   # For raw test scenes, use affine raw-space color correction.
   eval_raw_affine_cc: bool = False
-
+  dtype: str = 'float32'
 
 def define_common_flags():
   # Define the flags used by both train.py and eval.py

@@ -200,7 +200,7 @@ def main(unused_argv):
         avg_loss = avg_stats['loss']
         avg_psnr = avg_stats['psnr']
         str_losses = {  # Grab each "losses_{x}" field and print it as "x[:4]".
-            k[7:11]: (f'{v:0.5f}' if v >= 1e-4 and v < 10 else f'{v:0.1e}')
+            k[7:11]: (f'{float(v):0.5f}' if v >= 1e-4 and v < 10 else f'{float(v):0.1e}')
             for k, v in avg_stats.items()
             if k.startswith('losses/')
         }
