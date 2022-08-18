@@ -522,7 +522,11 @@ class Blender(Dataset):
       fprefix = os.path.join(self.data_dir, frame['file_path'])
 
       def get_img(f, fprefix=fprefix):
-        image = utils.load_img(fprefix + f)
+        filename = fprefix
+        if not any(match in fprefix for match in ['jpg', 'png']):
+          filename += f
+
+        image = utils.load_img(filename)
         if config.factor > 1:
           image = lib_image.downsample(image, config.factor)
         return image
