@@ -6,7 +6,7 @@ This repository contains the code release for three CVPR 2022 papers:
 [Ref-NeRF](https://dorverbin.github.io/refnerf/), and
 [RawNeRF](https://bmild.github.io/rawnerf/).
 This codebase was written by
-integrating our internal implementions of Ref-NeRF and RawNeRF into our
+integrating our internal implementations of Ref-NeRF and RawNeRF into our
 mip-NeRF 360 implementation. As such, this codebase should exactly
 reproduce the results shown in mip-NeRF 360, but may differ slightly when
 reproducing Ref-NeRF or RawNeRF results.
@@ -72,6 +72,37 @@ of training iterations and decrease the learning rate by whatever scale factor y
 decrease batch size by.
 
 ## Using your own data
+
+Summary: first, calculate poses. Second, train MultiNeRF. Third, render a result video from the trained NeRF model.
+
+1. Calculating poses (using COLMAP):
+```
+DATA_DIR=my_dataset_dir
+bash scripts/local_colmap_and_resize.sh ${DATA_DIR}
+```
+2. Training MultiNeRF
+```
+python -m train \
+  --gin_configs=configs/360.gin \
+  --gin_bindings="Config.data_dir = 'my_dataset_dir'" \
+  --gin_bindings="Config.checkpoint_dir = '${DATA_DIR}/checkpoints'" \
+  --logtostderr
+```
+3. Rendering MultiNeRF
+```
+python -m render \
+  --gin_configs=configs/360.gin \
+  --gin_bindings="Config.data_dir = '${DATA_DIR}'" \
+  --gin_bindings="Config.checkpoint_dir = '${DATA_DIR}/checkpoints'" \
+  --gin_bindings="Config.render_dir = '${DATA_DIR}/render'" \
+  --gin_bindings="Config.render_path = True" \
+  --gin_bindings="Config.render_path_frames = 480" \
+  --gin_bindings="Config.render_video_fps = 60" \
+  --logtostderr
+```
+Your output video should now exist in the directory `my_dataset_dir/render/`.
+
+See below for more detailed instructions on either using COLMAP to calculate poses or writing your own dataset loader (if you already have pose data from another source, like SLAM or RealityCapture).
 
 ### Running COLMAP to get camera poses
 
