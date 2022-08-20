@@ -1,5 +1,4 @@
 # MultiNeRF: A Code Release for Mip-NeRF 360, Ref-NeRF, and RawNeRF
-
 *This is not an officially supported Google product.*
 
 This repository contains the code release for three CVPR 2022 papers:
@@ -16,6 +15,12 @@ This implementation is written in [JAX](https://github.com/google/jax), and
 is a fork of [mip-NeRF](https://github.com/google/mipnerf).
 This is research code, and should be treated accordingly.
 
+# Changes vs original repo:
+- added GPU support via conda file
+- debugged OOM on RTX3090
+- enabled variable precision
+
+
 ## Setup
 
 ```
@@ -26,10 +31,16 @@ cd multinerf
 # Make a conda environment.
 conda env create -f requirements.yaml
 
+# Optionally, add the following environment variables
+# this one helps jax find the conda libs
+conda env config vars set LD_LIBRARY_PATH=$CONDA_PREFIX:$LD_LIBRARY_PATH
+conda env config vars set XLA_FLAGS="--xla_gpu_cuda_data_dir=$CONDA_PREFIX/bin/ --xla_gpu_force_compilation_parallelism=1 --xla_gpu_strict_conv_algorithm_picker=false"
+
 # Confirm that all the unit tests pass.
 ./scripts/run_all_unit_tests.sh
 ```
-You'll probably also need to update your JAX installation to support GPUs or TPUs.
+~~You'll probably also need to update your JAX installation to support GPUs or TPUs.~~
+Your JAX installation should be GPU ready.
 
 ## Running
 
@@ -40,6 +51,18 @@ for our model and some ablations can be found in `configs/`.
 After evaluating on the test set of each scene in one of the datasets, you can
 use `scripts/generate_tables.ipynb` to produce error metrics across all scenes
 in the same format as was used in tables in the paper.
+
+Naked example run:
+```
+conda activate multinerf_env
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.85 python -u train.py --gin_configs=<PATH_TO_YOUR_CONFIG> --logtostderr
+```
+Notes:
+- `XLA_PYTHON_CLIENT_MEM_FRACTION` - adjust this to GPU RAM
+- make a test `.gin` file that makes the training loop test all paths early as checkpointing and rendering has differrent memory profile, eg:
+  - `Config.train_render_every = 100`
+  - `Config.checkpoint_every = 200`
+
 
 ### OOM errors
 
