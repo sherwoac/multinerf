@@ -1,0 +1,7 @@
+include 'configs/fern_tests/llff_fern.gin'
+Config.checkpoint_dir = '/home/adam/CODE_z10/NERF_DATA/nerf_results/llff/fern_128/'
+
+Config.dtype = 'float32'
+
+PropMLP.net_width = 128
+NerfMLP.net_width = 128

@@ -16,6 +16,11 @@ is a fork of [mip-NeRF](https://github.com/google/mipnerf).
 This is research code, and should be treated accordingly.
 
 # Changes vs original repo:
+- added [results](fern_tests.md) showing impact of:
+  - float32 vs. bfloat16 vs. float16
+  - layer width:
+    - 256 vs 128
+    - 256 nerf and 128 prop (density)
 - added GPU support via conda file
 - debugged OOM on RTX3090
 - enabled variable precision

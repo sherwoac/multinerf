@@ -1,0 +1,4 @@
+include 'configs/fern_tests/llff_fern.gin'
+Config.checkpoint_dir = '/home/adam/CODE_z10/NERF_DATA/nerf_results/llff/fern_256/'
+
+Config.dtype = 'float32'
