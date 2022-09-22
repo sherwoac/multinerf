@@ -16,11 +16,12 @@
 from internal import math
 import jax
 import jax.numpy as jnp
-
+import gin
 
 def contract(x):
   """Contracts points towards the origin (Eq 10 of arxiv.org/abs/2111.12077)."""
-  eps = jnp.finfo(jnp.float32).eps
+  dtype = gin.query_parameter('Config.dtype')
+  eps = jnp.finfo(dtype).eps
   # Clamping to eps prevents non-finite gradients when x == 0.
   x_mag_sq = jnp.maximum(eps, jnp.sum(x**2, axis=-1, keepdims=True))
   z = jnp.where(x_mag_sq <= 1, x, ((2 * jnp.sqrt(x_mag_sq) - 1) / x_mag_sq) * x)
@@ -29,7 +30,8 @@ def contract(x):
 
 def inv_contract(z):
   """The inverse of contract()."""
-  eps = jnp.finfo(jnp.float32).eps
+  dtype = gin.query_parameter('Config.dtype')
+  eps = jnp.finfo(dtype).eps
   # Clamping to eps prevents non-finite gradients when z == 0.
   z_mag_sq = jnp.maximum(eps, jnp.sum(z**2, axis=-1, keepdims=True))
   x = jnp.where(z_mag_sq <= 1, z, z / (2 * jnp.sqrt(z_mag_sq) - z_mag_sq))

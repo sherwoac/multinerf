@@ -99,22 +99,22 @@ def generate_basis(base_shape,
     a = (np.sqrt(5.) + 1) / 2
     verts = np.array([(-1, 0, a), (1, 0, a), (-1, 0, -a), (1, 0, -a), (0, a, 1),
                       (0, a, -1), (0, -a, 1), (0, -a, -1), (a, 1, 0),
-                      (-a, 1, 0), (a, -1, 0), (-a, -1, 0)], dtype=gin.query_parameter('Config.dtype')) / np.sqrt(a + 2)
+                      (-a, 1, 0), (a, -1, 0), (-a, -1, 0)]) / np.sqrt(a + 2)
     faces = np.array([(0, 4, 1), (0, 9, 4), (9, 5, 4), (4, 5, 8), (4, 8, 1),
                       (8, 10, 1), (8, 3, 10), (5, 3, 8), (5, 2, 3), (2, 7, 3),
                       (7, 10, 3), (7, 6, 10), (7, 11, 6), (11, 0, 6), (0, 1, 6),
                       (6, 1, 10), (9, 0, 11), (9, 11, 2), (9, 2, 5),
-                      (7, 2, 11)], dtype=gin.query_parameter('Config.dtype'))
-    verts = tesselate_geodesic(verts, faces, angular_tesselation)
+                      (7, 2, 11)])
   elif base_shape == 'octahedron':
     verts = np.array([(0, 0, -1), (0, 0, 1), (0, -1, 0), (0, 1, 0), (-1, 0, 0),
-                      (1, 0, 0)], dtype=gin.query_parameter('Config.dtype'))
-    corners = np.array(list(itertools.product([-1, 1], repeat=3)), dtype=gin.query_parameter('Config.dtype'))
+                      (1, 0, 0)])
+    corners = np.array(list(itertools.product([-1, 1], repeat=3)))
     pairs = np.argwhere(compute_sq_dist(corners.T, verts.T) == 2)
     faces = np.sort(np.reshape(pairs[:, 1], [3, -1]).T, 1)
-    verts = tesselate_geodesic(verts, faces, angular_tesselation)
   else:
     raise ValueError(f'base_shape {base_shape} not supported')
+
+  verts = tesselate_geodesic(verts, faces, angular_tesselation)
 
   if remove_symmetries:
     # Remove elements of `verts` that are reflections of each other.
